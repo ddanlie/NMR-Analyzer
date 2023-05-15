@@ -14,3 +14,4 @@ and you can find parameters (by pressing "approximate" button) approximating thi
   1. W parameters are changed with sliders and their sum must be 1 before changes can be made (check sum in status)
   2. T parameters can be changed by pressing spinbox arrows OR putting any number from 1000 to defaulT*10 and PRESSING ENTER inside input field
 - You can copy parameters from right-bottom text field
+- IMPORTANT. If you seee weights are not 1 in sum in botton-right result panel - you found wrong count of exponents. Application can't handle it, you need to restart it and find less expoents.
