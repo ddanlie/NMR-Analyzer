@@ -149,7 +149,7 @@ class NMR(tk.Tk):
 
         #main frame
         
-        self.bottomPanel.pack(side="bottom", fill="both", expand=True, anchor="center", pady=25)
+        self.bottomPanel.pack(side="bottom", fill="both", anchor="center", pady=25)
         self.controlPanel.pack(side="right", anchor="center", padx=(0,25))
 
         #reset will pack canvas
