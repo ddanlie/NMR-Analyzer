@@ -5,6 +5,7 @@ from matplotlib.backend_bases import MouseEvent
 from matplotlib.widgets import SpanSelector
 from scipy.optimize import curve_fit
 from tkinter.font import Font
+from tkinter import filedialog
 import copy
 import numpy as np
 
@@ -83,13 +84,13 @@ class EntryScale(tk.Scale):
 
 class NMR(tk.Tk):
 
-    def __init__(self, data, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.geometry("1280x820")
 
         #logic
         self.current_curve_num = 1
-        self.data = data
+        self.data = None
         self.figure_log = []
         self.curve_log = [] #needs to be reversed
         self.edited_curves = [] 
@@ -97,6 +98,8 @@ class NMR(tk.Tk):
         self.weights_approx = True
         self.approximated_weights = [] #needs to be reversed
         self.state = "select"#or "approx"
+        self.approx_figure = None
+        self.current_figure = None
         #logic end
 
         #frames
@@ -125,6 +128,7 @@ class NMR(tk.Tk):
         self.previousCurveButton = tk.Button( self.controlPanel, text="Previous curve",  font=self.generalFont, command=self.previousCurveButton_pressed) 
         self.approxButton = tk.Button(self.controlPanel, text="Approximate",  font=self.generalFont, command=self.approxButton_pressed) 
         self.resetButton = tk.Button(self.controlPanel, text="Reset", font=self.generalFont, command=self.resetButton_pressed)
+        self.chooseFileButton = tk.Button(self.controlPanel, text="Choose file", font=self.generalFont, command=self.chooseFileButton_pressed)
 
         self.controlPanel.rowconfigure((2,3,4,5), minsize=40)#space between buttons
         self.controlPanel.rowconfigure(0, minsize=200)
@@ -134,7 +138,7 @@ class NMR(tk.Tk):
         self.previousCurveButton.grid(row=3, column=1, columnspan=2, sticky=tk.EW)
         self.approxButton.grid(row=4, column=1, columnspan=2, sticky=tk.EW)
         self.resetButton.grid(row=5, column=1, columnspan=2, sticky=tk.EW)
-        
+        self.chooseFileButton.grid(row=6, column=1, columnspan=2, sticky=tk.EW)
         #status panel
         
         #edit panel
@@ -165,17 +169,23 @@ class NMR(tk.Tk):
         axis = f.subplots(nrows=2, ncols=1)
         if(self.current_curve_num == 1):
             axis[0].set_yscale("log")
-        axis[0].plot(xy[0], xy[1])
+        if(xy != None):
+            axis[0].plot(xy[0], xy[1])
         return f
     
-    def get_approximate_figure(self, predicted_xy, original_xy):
-        f = plt.figure()
-        axis = f.subplots(nrows=2, ncols=1)
-        axis[0].set_yscale("log")
-        axis[0].plot(predicted_xy[0], predicted_xy[1], "g--")
-        axis[0].plot(original_xy[0], original_xy[1], "blue")
-        axis[1].plot(original_xy[0], original_xy[1]-predicted_xy[1], "red")
+    def get_approximate_figure(self, predicted_xy, original_xy, f=None):
+        if(f == None):
+            f = plt.figure()
+        else:
+            f.clf()
+
+        axes = f.subplots(nrows=2, ncols=1)
+        axes[0].set_yscale("log")
+        axes[0].plot(predicted_xy[0], predicted_xy[1], "g--")
+        axes[0].plot(original_xy[0], original_xy[1], "blue")
+        axes[1].plot(original_xy[0], original_xy[1]-predicted_xy[1], "red")
         return f
+
 
     def canvasPanel_pack(self, f):
         if(self.canvasPanel != None):
@@ -248,20 +258,23 @@ class NMR(tk.Tk):
         self.saveCurveButton.config(state="disabled")
         self.previousCurveButton.config(state="disabled")
         self.approxButton.config(state="disabled")
+        if(self.data == None):
+            self.saveCurveButton.config(state="disabled")
 
         for f in self.figure_log:
             plt.close(f)
         self.figure_log = []
 
-        self.current_figure = self.get_curve_select_figure(data)
+        self.approx_figure = None
+        self.current_figure = self.get_curve_select_figure(self.data)
 
         self.canvasPanel_pack(self.current_figure)
         self.span_selector_set_axis(self.current_figure.get_axes()[0])
 
     def approxButton_pressed(self):
 
-        x = np.array(data[0])
-        y = np.array(data[1])
+        x = np.array(self.data[0])
+        y = np.array(self.data[1])
         result = np.zeros(len(x))
         if(self.weights_approx):
             self.approximated_weights = []
@@ -288,10 +301,13 @@ class NMR(tk.Tk):
             for i in range(len(self.approximated_weights)):
                 result += self.approximated_weights[i]*(np.exp(x*self.edited_curves[i][0]))
 
-        if(hasattr(self, "approx_figure")):
-            plt.close(self.approx_figure)
-        self.approx_figure = self.get_approximate_figure((x, result), (x, y))
-        self.canvasPanel_pack(self.approx_figure)
+        if(self.mode == "approx"):
+            #plt.close(self.approx_figure)
+            self.approx_figure = self.get_approximate_figure((x, result), (x, y), self.approx_figure)
+            self.canvasPanel.draw()
+        else:
+            self.approx_figure = self.get_approximate_figure((x, result), (x, y))
+            self.canvasPanel_pack(self.approx_figure)
         #self.span_selector_set_axis(self.)
 
         self.saveCurveButton.config(state="disabled")
@@ -426,6 +442,8 @@ class NMR(tk.Tk):
         self.statuLabelVar_set("parameters changed")
         self.approxButton.config(state="normal")
 
+        self.approxButton_pressed()
+
 
     def update_edit(self):
         if(hasattr(self, "w_vars") and hasattr(self, "t_vars")):
@@ -467,30 +485,41 @@ class NMR(tk.Tk):
     def delete_approximation_edit(self):
         for c in self.editPanel.interior.winfo_children():
             if(not isinstance(c, tk.Button)):
+                print(c)
                 c.destroy()
+            else:
+                print("found button")
         self.w_vars = []
         self.t_vars = []
         self.update()
 
-t = []
-y = []
 
+    def chooseFileButton_pressed(self):
+        path = filedialog.askopenfilename()
+        self.read_file_data(path)
+        
+    
+    def read_file_data(self, path):
+        t = []
+        y = []
+        with open(path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                data = line.split(" ")  
+                #print(data)
+                t.append(float(data[0]))
+                if(len(data) < 3):
+                    y.append(float(data[1]))
+                else:
+                    y.append(float(data[2]))
+        y = np.array(y)
+        # n = 30
+        # y = np.convolve(y, np.ones(n) / n, mode='valid')
+        # t = t[0:-n+1]
+        y /= y[0] 
 
-with open('data.nmr', 'r') as f:
-    for line in f:
-        line = line.strip()
-        data = line.split(" ")  
-        #print(data)
-        t.append(float(data[0]))
-        if(len(data) < 3):
-            y.append(float(data[1]))
-        else:
-            y.append(float(data[2]))
-y = np.array(y)
-n = 30
-y = np.convolve(y, np.ones(n) / n, mode='valid')
-t = t[0:-n+1]
-y /= y[0] 
-data = (t,y)
-app = NMR(data)
+        self.data = (t,y)
+        self.resetButton_pressed()
+
+app = NMR()
 app.mainloop()
