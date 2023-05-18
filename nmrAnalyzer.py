@@ -253,7 +253,6 @@ class NMR(tk.Tk):
         elif(self.curr_switch  == "subtraction"):
             y_curve = np.exp(self.curve_function(x, *self.current_curve_params))    
             y_difference = y - y_curve
-            print(f"diff len = {len(y_difference)}")
             ax.plot(x, y_difference, color='red')
        
         self.canvasPanel.draw()
@@ -325,7 +324,6 @@ class NMR(tk.Tk):
             #we will aproximate ln(y)
             trim_ylog = np.log(trim_y)
         
-            print(f"trim len = {len(trim_x)}")
             self.current_curve_params, _ = curve_fit(self.curve_function, trim_x, trim_ylog, p0=(-1/len(trim_x), 1))
             self.switchSelectedButton_pressed((indmin,indmax), False)
             
@@ -419,6 +417,7 @@ class NMR(tk.Tk):
         self.saveCurveButton.config(state="disabled")
         self.approxButton.config(state="disabled")
         self.previousCurveButton.config(state="normal")
+        self.subtractButton.config(state="disabled")
         self.statuLabelVar_set(f"Approximated with {len(self.edited_curves)} curves")
 
         if(self.mode != "approx"):
@@ -494,6 +493,7 @@ class NMR(tk.Tk):
         self.previousCurveButton.config(state="normal")
         self.approxButton.config(state="normal")
         self.switchSelectedButton.config(state="disabled")
+        self.subtractButton.config(state="disabled")
         self.statuLabelVar_set("Curve saved")
 
         
@@ -546,8 +546,9 @@ class NMR(tk.Tk):
             for w,t in zip(coefs[len(self.edited_curves):], coefs[0:len(self.edited_curves)]):
                 result += w*np.exp(-x/(t*maxT))
             result /= result[0]
-            print(np.mean((result - y)**2))
-            return np.mean((result - y)**2)
+            err = np.mean((result - y)**2)
+            print(err)
+            return err
 
         def w_constraint(coefs):#coefs = T3,T2,T1...w3,w2,w1...
             ws = coefs[len(self.edited_curves):]
@@ -566,22 +567,22 @@ class NMR(tk.Tk):
                 maxT = t.get()
             
         for t in self.t_vars:
-            initial_guess.append(np.random.random())
-            bnds.append((0, 1))
+            initial_guess.append(t.get()/maxT)
+            bnds.append((0, None))
         for w in self.w_vars:
-            initial_guess.append(np.random.random())
+            initial_guess.append(w.get())
             bnds.append((0, 1))
 
         self.statuLabelVar_set("Solving...")
 
         cons = ({'type': 'eq', 'fun': w_constraint})
         
-        solution = minimize(objective, initial_guess, bounds=bnds, constraints=cons)
+        solution = minimize(objective, initial_guess, method="SLSQP", bounds=bnds, constraints=cons, options={"maxiter":1000, "ftol":1e-5, "disp": True, "eps": 0.85})
         
         self.statuLabelVar_set("Solved")
         
         
-        print(solution.x)
+        #print(solution.x)
         self.weights_approx = False
         self.approximated_weights = []
         for i, t in enumerate(solution.x[0:len(self.edited_curves)]):
