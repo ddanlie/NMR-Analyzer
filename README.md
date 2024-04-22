@@ -1,6 +1,9 @@
 # NMR-Analyzer
 This application analyzes NMR data to decompose them into individual exponential functions
 
+![image](https://github.com/ddanlie/NMR-Analyzer/assets/72508100/2bb7f12d-2109-4f66-90b7-32c8fe0368bb)
+
+
 # How to run:
 1. Execute python nmrAnalyzer.py
 
